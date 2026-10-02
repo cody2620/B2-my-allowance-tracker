@@ -3,6 +3,26 @@
 ## 실행 방법
 
 ## 저장 파일 위치와 형식
+- 파일구조
+```
+  budget_app/                ← 프로젝트 루트
+├── README.md                ← 실행 방법, 저장 파일 위치/형식, 명령 예시, CSV 스키마
+├── data/                    ← 기본 저장 폴더 (--data-dir 로 변경 가능, 자동 생성)
+│   ├── transactions.jsonl
+│   ├── categories.jsonl
+│   └── budgets.jsonl
+└── budget_app/              ← 패키지 (python -m budget_app 으로 실행)
+    ├── __init__.py
+    ├── __main__.py          ← 진입점: main() 호출 후 sys.exit(종료코드)
+    ├── cli.py               ← argparse 서브커맨드 정의, 대화형 input(), 출력 포맷
+    ├── models.py            ← dataclass: Transaction, Budget, Category
+    ├── repository.py        ← 파일 I/O: TransactionRepository, CategoryStore, BudgetStore
+    ├── services.py          ← 비즈니스 로직: TransactionService, BudgetService, CategoryService
+    ├── csv_io.py            ← import/export CSV 처리
+    ├── validators.py        ← 날짜/금액/type/category 검증 함수
+    ├── decorators.py        ← 예외 처리·시간 측정·로그 데코레이터
+    └── errors.py            ← 사용자 정의 예외 (원인 + 힌트 메시지)
+```
 
 ## 주요 명령
 
