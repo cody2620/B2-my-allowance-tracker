@@ -12,23 +12,32 @@
 ## 저장 파일 위치와 형식
 - 파일구조
 ```
-  budget_app/                ← 프로젝트 루트
-├── README.md                ← 실행 방법, 저장 파일 위치/형식, 명령 예시, CSV 스키마
-├── data/                    ← 기본 저장 폴더 (--data-dir 로 변경 가능, 자동 생성)
+B2-my-allowance-tracker/          ← 프로젝트 루트
+├── README.md                      ← 실행 방법, 저장 파일 위치/형식, 명령 예시
+├── .gitignore                     ← Git 무시 파일
+├── data/                          ← 기본 저장 폴더 (--data-dir 로 변경 가능, 자동 생성)
 │   ├── transactions.jsonl
 │   ├── categories.jsonl
 │   └── budgets.jsonl
-└── budget_app/              ← 패키지 (python -m budget_app 으로 실행)
+├── budget_app/                    ← 패키지 (python -m budget_app 으로 실행)
+│   ├── __init__.py                ← 패키지 초기화 및 버전 정보
+│   ├── __main__.py                ← 진입점: main() 호출 후 sys.exit(종료코드)
+│   ├── cli.py                     ← argparse 설정, 명령 라우팅, 대화형 입력, 출력 포맷
+│   ├── models.py                  ← dataclass: Transaction, Budget, Category 및 유틸 함수
+│   ├── repository.py              ← 파일 I/O: TransactionRepository, CategoryStore, BudgetStore
+│   ├── services.py                ← 비즈니스 로직: TransactionService, BudgetService, CategoryService,
+│   │                                            SummaryService, SearchFilter, ImportExportService
+│   ├── decorators.py              ← 예외 처리·시간 측정 데코레이터
+│   └── errors.py                  ← 사용자 정의 예외 (ValidationError 등)
+└── tests/                         ← 테스트 코드
     ├── __init__.py
-    ├── __main__.py          ← 진입점: main() 호출 후 sys.exit(종료코드)
-    ├── cli.py               ← argparse 서브커맨드 정의, 대화형 input(), 출력 포맷
-    ├── models.py            ← dataclass: Transaction, Budget, Category
-    ├── repository.py        ← 파일 I/O: TransactionRepository, CategoryStore, BudgetStore
-    ├── services.py          ← 비즈니스 로직: TransactionService, BudgetService, CategoryService
-    ├── csv_io.py            ← import/export CSV 처리
-    ├── validators.py        ← 날짜/금액/type/category 검증 함수
-    ├── decorators.py        ← 예외 처리·시간 측정·로그 데코레이터
-    └── errors.py            ← 사용자 정의 예외 (원인 + 힌트 메시지)
+    ├── helpers.py                 ← 테스트 유틸리티
+    ├── test_cli.py                ← CLI 명령어 테스트
+    ├── test_models.py             ← 모델 및 유틸 함수 테스트
+    ├── test_repository.py         ← 저장소 기능 테스트
+    ├── test_services.py           ← 서비스 로직 테스트
+    └── test_import_export.py      ← Import/Export 기능 테스트
+
 ```
 
 ## 주요 명령
@@ -47,8 +56,6 @@
   <summary> 최종 결과물 </summary>
   <img width="666" height="641" alt="1" src="https://github.com/user-attachments/assets/11e4a251-5def-4747-a3ae-a3cfd63fe8fb" />
   <img width="666" height="597" alt="2" src="https://github.com/user-attachments/assets/aea6acd6-6fd2-4090-a5e0-33274df41469" />
-
-
 
 
 </details>
