@@ -1,0 +1,19 @@
+# 실행 시 생성되는 개인 데이터
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 원자적 쓰기 중 남는 임시 파일
+.*.tmp
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# export로 만든 CSV를 프로젝트 안에 저장할 경우. 다만 테스트용 샘플 CSV를 커밋할 계획이라면 제외하세요.
+*.csv
