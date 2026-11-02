@@ -10,6 +10,37 @@
   ✅ gitignore가 존재하지만 실제로 제외된 파일 X
 
 ## 실행 방법
+```
+python3 -m budget_app <command> [options]
+
+# 목록 조회
+python3 -m budget_app list
+
+# 거래 추가
+python3 -m budget_app add
+
+# 거래 수정
+python3 -m budget_app update
+
+# 거래 삭제
+python3 -m budget_app delete
+
+# 카테고리 조회
+python3 -m budget_app category list
+
+# 카테고리 추가
+python3 -m budget_app category add 카테고리명
+
+# 카테고리 삭제
+python3 -m budget_app category remove 카테고리명
+
+# 가져오기 ** 추가 필요 **
+python3 -m budget_app import
+
+# 내보내기
+python3 -m budget_app export
+
+```
 
 ## 저장 파일 위치와 형식
 - 파일구조
