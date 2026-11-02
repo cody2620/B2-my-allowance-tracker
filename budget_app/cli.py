@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import unicodedata
 from typing import Callable, Iterable, Optional
 
 from .decorators import handle_errors, timed
@@ -54,8 +55,30 @@ def _context(args: argparse.Namespace) -> AppContext:
 
 
 # ---------------------------------------------------------------- 출력 포맷
+def _display_width(text: str) -> int:
+    """터미널에서 차지하는 폭을 계산한다 (한글 등 전각 문자는 2칸, 그 외는 1칸).
+
+    파이썬 문자열 포맷(%-Ns)은 '글자 개수' 기준이라 한글이 섞이면 표가 어긋난다.
+    """
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
+
+
+def _ljust(text: str, width: int) -> str:
+    return text + " " * max(0, width - _display_width(text))
+
+
+def _rjust(text: str, width: int) -> str:
+    return " " * max(0, width - _display_width(text)) + text
+
+
 def format_tx(tx: Transaction) -> str:
-    line = "%4d  %s  %-7s  %-10s  %14s" % (tx.id, tx.date, tx.type, tx.category, format_won(tx.amount))
+    line = "%4d  %s  %s  %s  %s" % (
+        tx.id,
+        tx.date,
+        _ljust(tx.type, 7),
+        _ljust(tx.category, 10),
+        _rjust(format_won(tx.amount), 14),
+    )
     if tx.memo:
         line += "  " + tx.memo
     if tx.tags:
@@ -68,7 +91,9 @@ def _print_transactions(items: Iterable[Transaction]) -> int:
     count = 0
     for tx in items:
         if count == 0:
-            print("%4s  %-10s  %-7s  %-10s  %14s" % ("ID", "날짜", "유형", "카테고리", "금액"))
+            print("%4s  %s  %s  %s  %s" % (
+                "ID", _ljust("날짜", 10), _ljust("유형", 7), _ljust("카테고리", 10), _rjust("금액", 14),
+            ))
         print(format_tx(tx))
         count += 1
     if count == 0:
