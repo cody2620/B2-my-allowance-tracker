@@ -1,7 +1,7 @@
 """데이터 모델과 입력 검증 함수.
 
 검증 함수(parse_*)는 add/update/import/budget/search 모든 입력 경로가 공통으로 사용한다.
-카테고리 이름 정규화 규칙: 앞뒤 공백을 제거하고 소문자로 변환한다 (예: ' Food ' -> 'food').
+카테고리 이름 정규화 규칙: 앞뒤 공백을 제거하고 소문자로 변환한다 (예: ' Food ' -> 'food', 한글은 대소문자 구분이 없어 공백만 제거됨).
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from .errors import ValidationError
 
 TYPES = ("income", "expense")
-DEFAULT_CATEGORIES = ("food", "transport", "rent", "etc")
+DEFAULT_CATEGORIES = ("식비", "교통", "주거", "기타")
 
 _DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _MONTH_RE = re.compile(r"[0-9]{4}-[0-9]{2}")
@@ -146,7 +146,7 @@ def parse_type(value: Any) -> str:
 def normalize_category(value: Any) -> str:
     text = "" if value is None else str(value).strip().lower()
     if not text:
-        raise ValidationError("카테고리 이름이 비어 있습니다", "공백이 아닌 이름을 입력하세요 (예: food)")
+        raise ValidationError("카테고리 이름이 비어 있습니다", "공백이 아닌 이름을 입력하세요 (예: 식비)")
     return text
 
 

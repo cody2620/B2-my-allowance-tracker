@@ -12,7 +12,7 @@ class ExportTest(TempDirTestCase):
         self.ctx_ = c = self.ctx()
         self.add_tx(c, date="2026-02-28", amount=1)
         self.add_tx(c, date="2026-03-01", amount=2000, memo="점심, 맛집", tags="a,b")
-        self.add_tx(c, date="2026-03-31", type="income", category="etc", amount=3000)
+        self.add_tx(c, date="2026-03-31", type="income", category="기타", amount=3000)
         self.add_tx(c, date="2026-04-01", amount=4)
 
     def read_csv(self, path):
@@ -32,8 +32,8 @@ class ExportTest(TempDirTestCase):
         self.assertEqual(self.ctx_.io.export_csv(out, month="2026-03"), 2)
         rows = self.read_csv(out)
         self.assertEqual(rows[0], ["date", "type", "category", "amount", "memo", "tags"])
-        self.assertEqual(rows[1], ["2026-03-01", "expense", "food", "2000", "점심, 맛집", "a,b"])
-        self.assertEqual(rows[2][:4], ["2026-03-31", "income", "etc", "3000"])
+        self.assertEqual(rows[1], ["2026-03-01", "expense", "식비", "2000", "점심, 맛집", "a,b"])
+        self.assertEqual(rows[2][:4], ["2026-03-31", "income", "기타", "3000"])
 
     def test_range_and_open_ended(self):
         out = self.path("out.csv")
@@ -68,14 +68,14 @@ class ImportTest(TempDirTestCase):
         ctx = self.ctx()
         path = self.write_csv(
             "date,type,category,amount,memo,tags\n"
-            "2026-03-01,expense,food,\"1,500\",점심,\"a,b\"\n"  # 2: ok
-            "2026-02-30,expense,food,1000,,\n"  # 3: 날짜
-            "2026-03-02,spend,food,1000,,\n"  # 4: type
+            "2026-03-01,expense,식비,\"1,500\",점심,\"a,b\"\n"  # 2: ok
+            "2026-02-30,expense,식비,1000,,\n"  # 3: 날짜
+            "2026-03-02,spend,식비,1000,,\n"  # 4: type
             "\n"  # 5: 빈 줄
             "2026-03-03,expense,game,1000,,\n"  # 6: 미등록 카테고리
-            "2026-03-04,expense,food,0,,\n"  # 7: 금액
-            "2026-03-05,income,etc,3000\n"  # 8: ok (memo/tags 열 생략)
-            "2026-03-06,expense,food,abc,,\n"  # 9: 금액
+            "2026-03-04,expense,식비,0,,\n"  # 7: 금액
+            "2026-03-05,income,기타,3000\n"  # 8: ok (memo/tags 열 생략)
+            "2026-03-06,expense,식비,abc,,\n"  # 9: 금액
         )
         result = ctx.io.import_csv(path)
         self.assertEqual((result.success, result.failed, result.skipped), (2, 5, 1))
@@ -94,7 +94,7 @@ class ImportTest(TempDirTestCase):
         ctx = self.ctx()
         self.add_tx(ctx, date="2026-03-10")  # id 1
         path = self.write_csv(
-            "date,type,category,amount\n2026-03-20,expense,food,5\n2026-03-01,expense,food,6\n",
+            "date,type,category,amount\n2026-03-20,expense,식비,5\n2026-03-01,expense,식비,6\n",
             encoding="utf-8-sig",
         )
         result = ctx.io.import_csv(path)
@@ -119,7 +119,7 @@ class ImportTest(TempDirTestCase):
 
     def test_too_many_columns_is_failed_row(self):
         ctx = self.ctx()
-        path = self.write_csv("date,type,category,amount,memo,tags\n2026-03-01,expense,food,5,a,b,c\n")
+        path = self.write_csv("date,type,category,amount,memo,tags\n2026-03-01,expense,식비,5,a,b,c\n")
         result = ctx.io.import_csv(path)
         self.assertEqual((result.success, result.failed), (0, 1))
 
@@ -127,7 +127,7 @@ class ImportTest(TempDirTestCase):
         ctx = self.ctx()
         self.add_tx(ctx)
         before = self.read_lines("transactions.jsonl")
-        ctx.io.import_csv(self.write_csv("date,type,category,amount\nbad,expense,food,5\n"))
+        ctx.io.import_csv(self.write_csv("date,type,category,amount\nbad,expense,식비,5\n"))
         self.assertEqual(self.read_lines("transactions.jsonl"), before)
 
     def test_roundtrip_export_import(self):

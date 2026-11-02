@@ -93,6 +93,20 @@ def _parse_date_or_today(raw: str) -> str:
     return today_str() if not raw.strip() else parse_date(raw)
 
 
+_TYPE_KO = {"수입": "income", "지출": "expense"}
+
+
+def _parse_type_ko(raw: str) -> str:
+    """대화형 입력은 한글(수입/지출)만 받고, 내부 저장값(income/expense)으로 바꿔준다."""
+    text = raw.strip()
+    if text not in _TYPE_KO:
+        raise ValidationError(
+            "타입은 수입 또는 지출이어야 합니다: '%s'" % text,
+            "수입이면 수입, 지출이면 지출 을 입력하세요",
+        )
+    return parse_type(_TYPE_KO[text])
+
+
 # ---------------------------------------------------------------- 명령 핸들러
 @handle_errors
 @timed
@@ -101,7 +115,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     names = ctx.categories.list()
     print("새 거래를 입력합니다. (중단: Ctrl+C)")
     date = _ask("날짜 [YYYY-MM-DD, 빈 입력=오늘]: ", _parse_date_or_today)
-    type_ = _ask("타입 [income/expense]: ", parse_type)
+    type_ = _ask("타입 [수입/지출]: ", _parse_type_ko)
     category = _ask("카테고리 [%s]: " % ", ".join(names), ctx.categories.require)
     amount = _ask("금액: ", parse_amount)
     memo = _ask("메모 (선택, Enter=건너뛰기): ", parse_memo)
@@ -365,7 +379,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = add_command(
         category_cmds,
         "add",
-        "카테고리를 추가합니다 (이름은 앞뒤 공백 제거 후 소문자로 정규화: ' Food ' -> 'food')",
+        "카테고리를 추가합니다 (이름은 앞뒤 공백 제거 후 소문자로 정규화: ' Food ' -> 'food', 한글은 공백만 제거)",
         cmd_category_add,
     )
     p.add_argument("name", help="카테고리 이름")

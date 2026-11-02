@@ -8,7 +8,7 @@ from tests.helpers import TempDirTestCase
 class AddValidationTest(TempDirTestCase):
     def test_rejects_bad_fields(self):
         ctx = self.ctx()
-        base = dict(date="2026-03-01", type="expense", category="food", amount=1000)
+        base = dict(date="2026-03-01", type="expense", category="식비", amount=1000)
         for field, bad in [
             ("date", "2026-02-30"),
             ("amount", "0"),
@@ -26,13 +26,13 @@ class AddValidationTest(TempDirTestCase):
         ctx = self.ctx()
         with self.assertRaises(ValidationError) as cm:
             self.add_tx(ctx, category="game")
-        self.assertIn("food", cm.exception.hint)
+        self.assertIn("식비", cm.exception.hint)
         self.assertIn("category add game", cm.exception.hint)
 
     def test_normalizes_category_amount_and_tags(self):
         ctx = self.ctx()
-        tx = self.add_tx(ctx, category=" FOOD ", amount="1,500", tags="a, b", memo="점심")
-        self.assertEqual((tx.category, tx.amount, tx.tags), ("food", 1500, ["a", "b"]))
+        tx = self.add_tx(ctx, category=" 식비 ", amount="1,500", tags="a, b", memo="점심")
+        self.assertEqual((tx.category, tx.amount, tx.tags), ("식비", 1500, ["a", "b"]))
 
 
 class ListOrderTest(TempDirTestCase):
@@ -66,10 +66,10 @@ class SearchTest(TempDirTestCase):
         super().setUp()
         self.ctx_ = self.ctx()
         c = self.ctx_
-        self.add_tx(c, date="2026-01-10", category="food", amount=1000, memo="Lunch Pizza", tags="meal")  # 1
-        self.add_tx(c, date="2026-02-10", type="income", category="etc", amount=5000, memo="salary", tags="work")  # 2
-        self.add_tx(c, date="2026-03-10", category="transport", amount=300, memo="bus", tags="Commute,work")  # 3
-        self.add_tx(c, date="2026-03-20", category="food", amount=2000, memo="pizza night", tags="meal")  # 4
+        self.add_tx(c, date="2026-01-10", category="식비", amount=1000, memo="Lunch Pizza", tags="meal")  # 1
+        self.add_tx(c, date="2026-02-10", type="income", category="기타", amount=5000, memo="salary", tags="work")  # 2
+        self.add_tx(c, date="2026-03-10", category="교통", amount=300, memo="bus", tags="Commute,work")  # 3
+        self.add_tx(c, date="2026-03-20", category="식비", amount=2000, memo="pizza night", tags="meal")  # 4
 
     def search(self, limit=20, **kw):
         flt = SearchFilter.from_raw(**kw)
@@ -84,7 +84,7 @@ class SearchTest(TempDirTestCase):
         self.assertEqual(self.search(date_to="2026-01-31"), [1])
 
     def test_category_type_q_tag(self):
-        self.assertEqual(self.search(category="FOOD"), [4, 1])
+        self.assertEqual(self.search(category=" 식비 "), [4, 1])
         self.assertEqual(self.search(type="income"), [2])
         self.assertEqual(self.search(q="PIZZA"), [4, 1])  # 대소문자 무시 부분일치
         self.assertEqual(self.search(q="izz"), [4, 1])
@@ -92,8 +92,8 @@ class SearchTest(TempDirTestCase):
         self.assertEqual(self.search(tag="commute"), [3])
 
     def test_conditions_are_anded(self):
-        self.assertEqual(self.search(category="food", q="pizza", date_from="2026-03-01"), [4])
-        self.assertEqual(self.search(category="food", tag="work"), [])
+        self.assertEqual(self.search(category="식비", q="pizza", date_from="2026-03-01"), [4])
+        self.assertEqual(self.search(category="식비", tag="work"), [])
 
     def test_limit(self):
         self.assertEqual(self.search(limit=2), [4, 3])
@@ -115,18 +115,18 @@ class SummaryTest(TempDirTestCase):
         super().setUp()
         self.ctx_ = c = self.ctx()
         self.add_tx(c, date="2026-02-28", amount=999999)  # 다른 달은 제외
-        self.add_tx(c, date="2026-03-01", type="income", category="etc", amount=3000000)
-        self.add_tx(c, date="2026-03-02", category="rent", amount=800000)
-        self.add_tx(c, date="2026-03-03", category="food", amount=30000)
-        self.add_tx(c, date="2026-03-04", category="food", amount=20000)
-        self.add_tx(c, date="2026-03-05", category="transport", amount=10000)
-        self.add_tx(c, date="2026-03-06", category="etc", amount=5000)
+        self.add_tx(c, date="2026-03-01", type="income", category="기타", amount=3000000)
+        self.add_tx(c, date="2026-03-02", category="주거", amount=800000)
+        self.add_tx(c, date="2026-03-03", category="식비", amount=30000)
+        self.add_tx(c, date="2026-03-04", category="식비", amount=20000)
+        self.add_tx(c, date="2026-03-05", category="교통", amount=10000)
+        self.add_tx(c, date="2026-03-06", category="기타", amount=5000)
         self.add_tx(c, date="2026-04-01", amount=777777)  # 다른 달은 제외
 
     def test_totals_and_top(self):
         s = self.ctx_.summary.monthly("2026-03", 3)
         self.assertEqual((s.income, s.expense, s.balance, s.count), (3000000, 865000, 2135000, 6))
-        self.assertEqual(s.top, [("rent", 800000), ("food", 50000), ("transport", 10000)])
+        self.assertEqual(s.top, [("주거", 800000), ("식비", 50000), ("교통", 10000)])
         self.assertIsNone(s.budget)
         self.assertIsNone(s.usage_pct)
 
@@ -157,7 +157,7 @@ class SummaryTest(TempDirTestCase):
 
 class CategoryServiceTest(TempDirTestCase):
     def test_defaults_created(self):
-        self.assertEqual(self.ctx().categories.list(), ["food", "transport", "rent", "etc"])
+        self.assertEqual(self.ctx().categories.list(), ["식비", "교통", "주거", "기타"])
 
     def test_add_duplicate_and_remove_missing(self):
         ctx = self.ctx()
@@ -165,33 +165,33 @@ class CategoryServiceTest(TempDirTestCase):
         with self.assertRaises(DuplicateError):
             ctx.categories.add("GAME")
         with self.assertRaises(DuplicateError):
-            ctx.categories.add("food")
+            ctx.categories.add("식비")
         with self.assertRaises(NotFoundError):
             ctx.categories.remove("nothing")
 
     def test_remove_blocked_when_in_use(self):
         ctx = self.ctx()
-        self.add_tx(ctx, category="food")
-        self.add_tx(ctx, category="food")
+        self.add_tx(ctx, category="식비")
+        self.add_tx(ctx, category="식비")
         with self.assertRaises(CategoryInUseError) as cm:
-            ctx.categories.remove("food")
+            ctx.categories.remove("식비")
         self.assertIn("2건", cm.exception.message)
         self.assertIn("update", cm.exception.hint)
         self.assertIn("delete", cm.exception.hint)
-        self.assertIn("food", ctx.categories.list())
+        self.assertIn("식비", ctx.categories.list())
 
     def test_remove_allowed_when_unused(self):
         ctx = self.ctx()
-        ctx.categories.remove("rent")
-        self.assertNotIn("rent", ctx.categories.list())
+        ctx.categories.remove("주거")
+        self.assertNotIn("주거", ctx.categories.list())
 
 
 class UpdateDeleteServiceTest(TempDirTestCase):
     def test_update_only_given_fields(self):
         ctx = self.ctx()
         tx = self.add_tx(ctx, date="2026-03-01", amount=1000, memo="orig", tags="a")
-        updated = ctx.transactions.update(tx.id, amount="2,500", category="Rent")
-        self.assertEqual((updated.amount, updated.category), (2500, "rent"))
+        updated = ctx.transactions.update(tx.id, amount="2,500", category=" 주거 ")
+        self.assertEqual((updated.amount, updated.category), (2500, "주거"))
         self.assertEqual((updated.date, updated.memo, updated.tags), ("2026-03-01", "orig", ["a"]))
 
     def test_update_clear_memo_and_tags_with_empty_string(self):

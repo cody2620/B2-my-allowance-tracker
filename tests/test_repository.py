@@ -16,7 +16,7 @@ from tests.helpers import TempDirTestCase
 
 
 def make_tx(tx_id, date, **kw):
-    fields = dict(type="expense", amount=100, category="food", memo="", tags=[])
+    fields = dict(type="expense", amount=100, category="식비", memo="", tags=[])
     fields.update(kw)
     return Transaction(id=tx_id, date=date, **fields)
 
@@ -168,7 +168,7 @@ class SmallStoresTest(TempDirTestCase):
     def test_category_defaults_and_crud(self):
         store = CategoryStore(self.data_dir)
         self.assertTrue(store.ensure_defaults())
-        self.assertEqual(store.names(), ["food", "transport", "rent", "etc"])
+        self.assertEqual(store.names(), ["식비", "교통", "주거", "기타"])
         self.assertFalse(store.ensure_defaults())
         store.add(" Game ")
         self.assertTrue(store.exists("GAME"))

@@ -78,11 +78,11 @@ class ParseTypeCategoryTagsTest(unittest.TestCase):
 
 class TransactionModelTest(unittest.TestCase):
     def test_roundtrip(self):
-        tx = Transaction(id=1, type="expense", date="2026-03-01", amount=1000, category="food", memo="점심", tags=["a"])
+        tx = Transaction(id=1, type="expense", date="2026-03-01", amount=1000, category="식비", memo="점심", tags=["a"])
         self.assertEqual(Transaction.from_dict(tx.to_dict()), tx)
 
     def test_defaults(self):
-        tx = Transaction(id=1, type="income", date="2026-03-01", amount=1, category="etc")
+        tx = Transaction(id=1, type="income", date="2026-03-01", amount=1, category="기타")
         self.assertEqual((tx.memo, tx.tags), ("", []))
 
     def test_from_dict_rejects_bad_record(self):

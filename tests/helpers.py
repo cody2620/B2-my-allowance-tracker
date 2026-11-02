@@ -25,7 +25,7 @@ class TempDirTestCase(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             return AppContext(self.data_dir)
 
-    def add_tx(self, ctx: AppContext, date="2026-03-01", type="expense", category="food", amount=1000, memo="", tags=None):
+    def add_tx(self, ctx: AppContext, date="2026-03-01", type="expense", category="식비", amount=1000, memo="", tags=None):
         return ctx.transactions.add(date=date, type=type, category=category, amount=amount, memo=memo, tags=tags)
 
     def run_cli(self, *argv: str, inputs: List[str] = ()) -> Tuple[int, str, str]:

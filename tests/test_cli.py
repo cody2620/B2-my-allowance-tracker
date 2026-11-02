@@ -141,7 +141,7 @@ class NoTracebackTest(TempDirTestCase):
 
 class AddInteractiveTest(TempDirTestCase):
     def test_add_saves_and_prints_id(self):
-        code, out, _ = self.run_cli("add", inputs=["2026-03-05", "expense", "food", "1,500", "점심", "a, b"])
+        code, out, _ = self.run_cli("add", inputs=["2026-03-05", "지출", "식비", "1,500", "점심", "a, b"])
         self.assertEqual(code, 0)
         self.assertIn("저장되었습니다. id=1", out)
         self.assertIn("기본 카테고리를 생성했습니다", out)  # 결정 1: 안내 메시지
@@ -153,7 +153,7 @@ class AddInteractiveTest(TempDirTestCase):
     def test_blank_date_means_today(self):
         from budget_app.models import today_str
 
-        self.run_cli("add", inputs=["", "income", "etc", "100", "", ""])
+        self.run_cli("add", inputs=["", "수입", "기타", "100", "", ""])
         _, out, _ = self.run_cli("list")
         self.assertIn(today_str(), out)
 
@@ -162,9 +162,9 @@ class AddInteractiveTest(TempDirTestCase):
             "2026-02-30",  # 날짜 오류 → 재입력
             "2026-03-05",
             "spend",  # 타입 오류 → 재입력
-            "expense",
+            "지출",
             "game",  # 카테고리 오류 → 재입력
-            "food",
+            "식비",
             "0",  # 금액 오류
             "abc",  # 금액 오류
             "2000",
@@ -190,7 +190,7 @@ class AddInteractiveTest(TempDirTestCase):
         self.assertIn("존재하지 않는 날짜", text)
         self.assertIn("등록되지 않은 카테고리", text)
         self.assertIn("category add game", text)  # 목록 + 등록 유도
-        self.assertIn("food, transport, rent, etc", text)
+        self.assertIn("식비, 교통, 주거, 기타", text)
         self.assertNotIn("Traceback", text)
         self.assertIn("저장되었습니다. id=1", out.getvalue())
 
@@ -202,9 +202,9 @@ class AddInteractiveTest(TempDirTestCase):
 
 class CommandFlowTest(TempDirTestCase):
     def seed(self):
-        self.run_cli("add", inputs=["2026-03-01", "income", "etc", "3000000", "월급", ""])
-        self.run_cli("add", inputs=["2026-03-02", "expense", "food", "12000", "Lunch Pizza", "meal"])
-        self.run_cli("add", inputs=["2026-03-03", "expense", "rent", "800000", "", ""])
+        self.run_cli("add", inputs=["2026-03-01", "수입", "기타", "3000000", "월급", ""])
+        self.run_cli("add", inputs=["2026-03-02", "지출", "식비", "12000", "Lunch Pizza", "meal"])
+        self.run_cli("add", inputs=["2026-03-03", "지출", "주거", "800000", "", ""])
 
     def test_list_order_limit_and_empty(self):
         code, out, _ = self.run_cli("list")
@@ -218,7 +218,7 @@ class CommandFlowTest(TempDirTestCase):
 
     def test_search_cli(self):
         self.seed()
-        _, out, _ = self.run_cli("search", "--q", "pizza", "--category", "food", "--from", "2026-03-01")
+        _, out, _ = self.run_cli("search", "--q", "pizza", "--category", "식비", "--from", "2026-03-01")
         self.assertIn("Lunch Pizza", out)
         self.assertNotIn("월급", out)
         _, out, _ = self.run_cli("search", "--q", "없는키워드")
@@ -230,7 +230,7 @@ class CommandFlowTest(TempDirTestCase):
         self.assertIn("총수입: 3,000,000원", out)
         self.assertIn("총지출: 812,000원", out)
         self.assertIn("잔액:   2,188,000원", out)
-        self.assertIn("1. rent", out)
+        self.assertIn("1. 주거", out)
         self.assertIn("예산: 설정되지 않음", out)
         self.assertNotIn("⚠", out)
 
@@ -260,7 +260,7 @@ class CommandFlowTest(TempDirTestCase):
         code, out, _ = self.run_cli("category", "add", " Game ")
         self.assertEqual(code, 0)
         _, out, _ = self.run_cli("category", "list")
-        self.assertEqual(out.split(), ["food", "transport", "rent", "etc", "game"][0:0] or out.split())
+        self.assertEqual(out.split(), ["식비", "교통", "주거", "기타", "game"][0:0] or out.split())
         self.assertIn("game", out.split())
         code, _, err = self.run_cli("category", "add", "GAME")
         self.assertEqual(code, 2)
@@ -270,13 +270,13 @@ class CommandFlowTest(TempDirTestCase):
 
     def test_category_remove_blocked_cli(self):
         self.seed()
-        code, out, err = self.run_cli("category", "remove", "food")
+        code, out, err = self.run_cli("category", "remove", "식비")
         self.assertEqual(code, 1)
         self.assertIn("1건", err)
         self.assertIn("update", err)
         self.assertNotIn("Traceback", err)
         _, out, _ = self.run_cli("category", "list")
-        self.assertIn("food", out.split())
+        self.assertIn("식비", out.split())
 
     def test_update_cli(self):
         self.seed()
@@ -305,7 +305,7 @@ class CommandFlowTest(TempDirTestCase):
     def test_new_id_after_delete_is_max_plus_one(self):
         self.seed()
         self.run_cli("delete", "--id", "3", "--yes")
-        _, out, _ = self.run_cli("add", inputs=["2026-03-09", "expense", "food", "5", "", ""])
+        _, out, _ = self.run_cli("add", inputs=["2026-03-09", "지출", "식비", "5", "", ""])
         self.assertIn("id=3", out)
 
     def test_import_export_cli(self):
@@ -322,7 +322,7 @@ class CommandFlowTest(TempDirTestCase):
 
         bad = self.path("bad.csv")
         with open(bad, "w", encoding="utf-8") as f:
-            f.write("date,type,category,amount,memo,tags\n2026-04-01,expense,food,100,ok,\n2026-04-02,expense,zzz,100,,\n")
+            f.write("date,type,category,amount,memo,tags\n2026-04-01,expense,식비,100,ok,\n2026-04-02,expense,zzz,100,,\n")
         code, out, err = self.run_cli("import", "--from", bad)
         self.assertEqual(code, 1)
         self.assertIn("줄 3:", err)
@@ -332,7 +332,7 @@ class CommandFlowTest(TempDirTestCase):
 
         good = self.path("good.csv")
         with open(good, "w", encoding="utf-8-sig") as f:
-            f.write("date,type,category,amount\n2026-04-05,expense,food,\"2,000\"\n")
+            f.write("date,type,category,amount\n2026-04-05,expense,식비,\"2,000\"\n")
         code, out, _ = self.run_cli("import", "--from", good)
         self.assertEqual(code, 0)
         self.assertIn("성공 1건 / 실패 0건 / 건너뜀 0건", out)
