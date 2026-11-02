@@ -71,18 +71,23 @@ def _rjust(text: str, width: int) -> str:
     return " " * max(0, width - _display_width(text)) + text
 
 
+_TYPE_LABEL_KO = {"income": "수입", "expense": "지출"}  # 저장값은 income/expense, 화면 표시만 한글
+
+
+_MEMO_COL_WIDTH = 12
+
+
 def format_tx(tx: Transaction) -> str:
-    line = "%4d  %s  %s  %s  %s" % (
+    tags = " ".join("#" + t for t in tx.tags) if tx.tags else "-"
+    line = "%4d  %s  %s  %s  %s  %s  %s" % (
         tx.id,
         tx.date,
-        _ljust(tx.type, 7),
+        _ljust(_TYPE_LABEL_KO.get(tx.type, tx.type), 7),
         _ljust(tx.category, 10),
         _rjust(format_won(tx.amount), 14),
+        _ljust(tx.memo if tx.memo else "-", _MEMO_COL_WIDTH),
+        tags,
     )
-    if tx.memo:
-        line += "  " + tx.memo
-    if tx.tags:
-        line += "  " + " ".join("#" + t for t in tx.tags)
     return line
 
 
@@ -91,8 +96,9 @@ def _print_transactions(items: Iterable[Transaction]) -> int:
     count = 0
     for tx in items:
         if count == 0:
-            print("%4s  %s  %s  %s  %s" % (
+            print("%4s  %s  %s  %s  %s  %s  %s" % (
                 "ID", _ljust("날짜", 10), _ljust("유형", 7), _ljust("카테고리", 10), _rjust("금액", 14),
+                _ljust("메모", _MEMO_COL_WIDTH), "태그",
             ))
         print(format_tx(tx))
         count += 1
