@@ -1,6 +1,15 @@
 """명령 핸들러 공통 데코레이터.
 
 핸들러는 `handler(args) -> int(종료 코드)` 형태이며 `@handle_errors` 가 가장 바깥에 온다.
+
+cli.py 의 모든 cmd_* 함수가 아래처럼 쓴다:
+
+    @handle_errors      # 바깥: 예외를 잡아 메시지 출력 + 종료 코드 반환
+    @timed              # 안쪽: --verbose 일 때 실행 시간 출력
+    def cmd_add(args): ...
+
+실행 순서: handle_errors.wrapper → timed.wrapper → cmd_add → (반환) timed → handle_errors.
+덕분에 명령 함수 안에는 try/except 를 따로 쓰지 않아도 된다.
 """
 from __future__ import annotations
 
@@ -12,17 +21,26 @@ from typing import Callable
 
 from .errors import BudgetError
 
-Handler = Callable[..., int]
+Handler = Callable[..., int]  # 명령 함수의 타입: 인자를 받아 종료 코드(int)를 반환
 
 
 def report_error(message: str, hint: str = "") -> None:
-    """'원인 + 해결 힌트'를 stderr에 출력한다."""
+    """'원인 + 해결 힌트'를 stderr에 출력한다.
+
+    출력 형식:
+        오류: {message}
+        힌트: {hint}      ← hint 가 있을 때만
+    """
     print("오류: %s" % message, file=sys.stderr)
     if hint:
         print("힌트: %s" % hint, file=sys.stderr)
 
 
 def _describe_os_error(exc: OSError):
+    """파이썬의 파일 관련 예외(OSError)를 사용자가 이해할 수 있는 (메시지, 힌트) 쌍으로 바꾼다.
+
+    예: FileNotFoundError → ("파일 또는 폴더를 찾을 수 없습니다 (경로)", "경로가 맞는지 확인하세요")
+    """
     target = " (%s)" % exc.filename if getattr(exc, "filename", None) else ""
     if isinstance(exc, FileNotFoundError):
         return "파일 또는 폴더를 찾을 수 없습니다%s" % target, "경로가 맞는지 확인하세요"
@@ -37,7 +55,16 @@ def _describe_os_error(exc: OSError):
 
 
 def handle_errors(func: Handler) -> Handler:
-    """예외를 잡아 stderr에 안내하고 종료 코드를 반환한다. 스택트레이스는 출력하지 않는다."""
+    """예외를 잡아 stderr에 안내하고 종료 코드를 반환한다. 스택트레이스는 출력하지 않는다.
+
+    잡는 예외와 종료 코드:
+        BudgetError (앱이 직접 낸 오류)  → 메시지·힌트 출력, 예외의 exit_code
+        KeyboardInterrupt (Ctrl+C)      → "중단되었습니다", 130
+        BrokenPipeError (`| head` 등)   → 조용히 0
+        EOFError (입력이 끝남)          → 대화형 입력 불가 안내, 2
+        OSError (파일 입출력)           → _describe_os_error 로 안내, 1
+        ValueError / 그 밖의 예외       → 일반 안내, 1
+    """
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> int:
@@ -79,7 +106,10 @@ def handle_errors(func: Handler) -> Handler:
 
 
 def timed(func: Handler) -> Handler:
-    """--verbose 일 때만 실행 시간을 stderr에 출력한다. 첫 인자는 argparse Namespace."""
+    """--verbose 일 때만 실행 시간을 stderr에 출력한다. 첫 인자는 argparse Namespace.
+
+    예외가 나도 finally 에서 시간을 출력한 뒤, 예외는 그대로 바깥(handle_errors)으로 넘긴다.
+    """
 
     @functools.wraps(func)
     def wrapper(args, *rest, **kwargs):

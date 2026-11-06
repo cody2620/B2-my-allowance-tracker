@@ -1,4 +1,21 @@
-"""argparse 설정, 명령 라우팅, 대화형 입력, 출력 포맷."""
+"""argparse 설정, 명령 라우팅, 대화형 입력, 출력 포맷.
+
+이 파일의 역할: 사용자와 직접 만나는 유일한 계층. print/input 은 여기서만 쓴다.
+업무 규칙은 services.py 에 맡기고, 여기서는 "무엇을 묻고, 결과를 어떻게 보여줄지"만 정한다.
+
+실행 흐름:
+    main(argv)
+      → build_parser().parse_args(argv)        명령줄 → args (Namespace)
+      → args.func(args)                        선택된 명령의 cmd_* 함수 호출
+          → @handle_errors → @timed → cmd_*    (decorators.py)
+              → _context(args)                 AppContext: 저장소·서비스 조립
+              → ctx.<서비스>.<메서드>(...)      services.py 에 일을 시킴
+              → print(...)                     결과 출력
+      → 종료 코드(int) 반환
+
+파일 구성 (위에서부터): AppContext → 출력 포맷 도우미 → 대화형 입력 도우미
+→ cmd_* 명령 핸들러 → argparse 파서 → main
+"""
 from __future__ import annotations
 
 import argparse
@@ -29,13 +46,23 @@ from .services import (
     TransactionService,
 )
 
-DEFAULT_DATA_DIR = "data"
-DEFAULT_LIST_LIMIT = 20
+DEFAULT_DATA_DIR = "data"  # --data-dir 를 주지 않았을 때 저장 폴더
+DEFAULT_LIST_LIMIT = 20  # list/search 의 기본 출력 건수
 
 
 # ---------------------------------------------------------------- 컨텍스트
 class AppContext:
-    """--data-dir 하나로 저장소와 서비스를 조립한다."""
+    """--data-dir 하나로 저장소와 서비스를 조립한다.
+
+    명령 함수는 이 객체의 속성으로 서비스를 쓴다:
+        ctx.categories    CategoryService
+        ctx.transactions  TransactionService
+        ctx.budgets       BudgetService
+        ctx.summary       SummaryService
+        ctx.io            ImportExportService (CSV)
+    같은 TransactionRepository 하나를 여러 서비스가 함께 쓴다.
+    만들 때 카테고리 파일이 비어 있으면 기본 카테고리를 생성하고 안내를 출력한다.
+    """
 
     def __init__(self, data_dir: str):
         repo = TransactionRepository(data_dir)
@@ -51,6 +78,7 @@ class AppContext:
 
 
 def _context(args: argparse.Namespace) -> AppContext:
+    """명령 함수마다 맨 처음 부르는 함수. args.data_dir 로 AppContext 를 만든다."""
     return AppContext(args.data_dir)
 
 
@@ -64,20 +92,27 @@ def _display_width(text: str) -> int:
 
 
 def _ljust(text: str, width: int) -> str:
+    """화면 폭 기준 왼쪽 정렬 (오른쪽을 공백으로 채움). str.ljust 의 한글 대응판."""
     return text + " " * max(0, width - _display_width(text))
 
 
 def _rjust(text: str, width: int) -> str:
+    """화면 폭 기준 오른쪽 정렬 (왼쪽을 공백으로 채움). 금액 열에 쓴다."""
     return " " * max(0, width - _display_width(text)) + text
 
 
 _TYPE_LABEL_KO = {"income": "수입", "expense": "지출"}  # 저장값은 income/expense, 화면 표시만 한글
 
 
-_MEMO_COL_WIDTH = 12
+_MEMO_COL_WIDTH = 12  # 메모 열의 화면 폭 (이보다 길면 뒤 열이 밀릴 수 있음)
 
 
 def format_tx(tx: Transaction) -> str:
+    """거래 하나를 표의 한 줄 문자열로 만든다. list/search/update/delete 출력에 공통으로 쓴다.
+
+    예: "   7  2026-03-05  지출     식비            12,000원  점심          #회사"
+    열 순서: ID, 날짜, 유형(한글), 카테고리, 금액, 메모(없으면 -), 태그(없으면 -)
+    """
     tags = " ".join("#" + t for t in tx.tags) if tx.tags else "-"
     line = "%4d  %s  %s  %s  %s  %s  %s" % (
         tx.id,
@@ -109,7 +144,13 @@ def _print_transactions(items: Iterable[Transaction]) -> int:
 
 # ---------------------------------------------------------------- 대화형 입력
 def _ask(prompt: str, parse: Callable[[str], object]):
-    """검증에 실패하면 안내 후 해당 항목만 다시 묻는다."""
+    """검증에 실패하면 안내 후 해당 항목만 다시 묻는다.
+
+    prompt: 화면에 보여줄 질문
+    parse:  입력 문자열을 검증·변환하는 함수 (예: parse_amount). ValidationError 를 내면 재질문.
+    반환:   parse 가 돌려준 값 (예: "12,000" → 12000)
+    cmd_add 가 항목마다 한 번씩 부른다.
+    """
     while True:
         raw = input(prompt)
         try:
@@ -121,10 +162,11 @@ def _ask(prompt: str, parse: Callable[[str], object]):
 
 
 def _parse_date_or_today(raw: str) -> str:
+    """add 의 날짜 입력용: 빈 입력이면 오늘 날짜, 아니면 parse_date 로 검증."""
     return today_str() if not raw.strip() else parse_date(raw)
 
 
-_TYPE_KO = {"수입": "income", "지출": "expense"}
+_TYPE_KO = {"수입": "income", "지출": "expense"}  # 대화형 입력(한글) → 저장값(영문)
 
 
 def _parse_type_ko(raw: str) -> str:
@@ -139,9 +181,20 @@ def _parse_type_ko(raw: str) -> str:
 
 
 # ---------------------------------------------------------------- 명령 핸들러
+# 모든 cmd_* 함수의 공통 모양:
+#   1. ctx = _context(args)          서비스 준비
+#   2. ctx.<서비스>.<메서드>(...)     실제 일은 services 에 맡김
+#   3. print(...)                    결과 출력
+#   4. return 0                      성공 (오류는 예외로 던지면 @handle_errors 가 처리)
+
 @handle_errors
 @timed
 def cmd_add(args: argparse.Namespace) -> int:
+    """`add`: 거래 한 건을 대화형으로 입력받아 저장한다.
+
+    날짜 → 타입 → 카테고리 → 금액 → 메모 → 태그 순으로 묻고, 각 항목은 입력 즉시 검증한다.
+    모두 통과하면 TransactionService.add 로 저장하고 새 id 를 알려준다.
+    """
     ctx = _context(args)
     names = ctx.categories.list()
     print("새 거래를 입력합니다. (중단: Ctrl+C)")
@@ -159,6 +212,7 @@ def cmd_add(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_list(args: argparse.Namespace) -> int:
+    """`list [--limit N]`: 최신 거래부터 N건(기본 20)을 표로 출력한다."""
     ctx = _context(args)
     _print_transactions(ctx.transactions.latest(args.limit))
     return 0
@@ -167,6 +221,10 @@ def cmd_list(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_search(args: argparse.Namespace) -> int:
+    """`search [--from --to --category --type --q --tag --limit]`: 조건을 모두 만족하는 거래를 최신순 출력.
+
+    옵션들을 SearchFilter 로 묶어 TransactionService.search 에 넘긴다.
+    """
     ctx = _context(args)
     flt = SearchFilter.from_raw(
         date_from=args.date_from,
@@ -183,6 +241,10 @@ def cmd_search(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_summary(args: argparse.Namespace) -> int:
+    """`summary --month YYYY-MM [--top N]`: 한 달의 수입·지출·잔액, 지출 TOP N, 예산 사용률 출력.
+
+    계산은 SummaryService.monthly 가 하고, 여기서는 MonthlySummary 를 보기 좋게 출력만 한다.
+    """
     ctx = _context(args)
     summary = ctx.summary.monthly(args.month, args.top)
     print("=== %s 요약 ===" % summary.month)
@@ -210,6 +272,7 @@ def cmd_summary(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_budget_set(args: argparse.Namespace) -> int:
+    """`budget set --month YYYY-MM --amount N`: 월 예산 저장. 기존 값을 덮어썼으면 그 금액도 알려준다."""
     ctx = _context(args)
     budget, previous = ctx.budgets.set(args.month, args.amount)
     print("예산이 저장되었습니다: %s %s" % (budget.month, format_won(budget.amount)))
@@ -221,6 +284,7 @@ def cmd_budget_set(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_budget_show(args: argparse.Namespace) -> int:
+    """`budget show --month YYYY-MM`: 월 예산 출력. 없으면 설정 방법을 안내한다 (오류 아님)."""
     ctx = _context(args)
     budget = ctx.budgets.show(args.month)
     if budget is None:
@@ -233,6 +297,7 @@ def cmd_budget_show(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_category_add(args: argparse.Namespace) -> int:
+    """`category add NAME`: 카테고리 추가. 출력되는 이름은 정규화된 이름이다 (예: " Food " → food)."""
     ctx = _context(args)
     print("카테고리가 추가되었습니다: %s" % ctx.categories.add(args.name))
     return 0
@@ -241,6 +306,7 @@ def cmd_category_add(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_category_list(args: argparse.Namespace) -> int:
+    """`category list`: 등록된 카테고리를 한 줄에 하나씩 출력."""
     ctx = _context(args)
     for name in ctx.categories.list():
         print(name)
@@ -250,6 +316,7 @@ def cmd_category_list(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_category_remove(args: argparse.Namespace) -> int:
+    """`category remove NAME`: 카테고리 삭제. 그 카테고리를 쓰는 거래가 있으면 거부된다."""
     ctx = _context(args)
     print("카테고리가 삭제되었습니다: %s" % ctx.categories.remove(args.name))
     return 0
@@ -258,6 +325,10 @@ def cmd_category_remove(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_update(args: argparse.Namespace) -> int:
+    """`update --id N [--date --type --category --amount --memo --tags]`: 준 옵션의 필드만 수정.
+
+    주지 않은 옵션은 None 으로 넘어가 서비스가 무시한다. 수정 결과를 한 줄로 보여준다.
+    """
     ctx = _context(args)
     tx = ctx.transactions.update(
         args.id,
@@ -276,6 +347,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_delete(args: argparse.Namespace) -> int:
+    """`delete --id N [--yes]`: 거래 삭제. --yes 가 없으면 삭제할 거래를 보여주고 y/N 으로 확인한다."""
     ctx = _context(args)
     tx = ctx.transactions.get(args.id)  # 없는 id 는 확인 질문 전에 오류 처리
     if not args.yes:
@@ -291,6 +363,11 @@ def cmd_delete(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_import(args: argparse.Namespace) -> int:
+    """`import --from CSV`: CSV 의 거래를 가져온다.
+
+    실패한 행은 줄 번호와 사유를 stderr 에 출력하고, 유효한 행만 저장된다.
+    실패가 1건이라도 있으면 종료 코드 1 (스크립트에서 실패를 감지할 수 있도록).
+    """
     ctx = _context(args)
     result = ctx.io.import_csv(args.csv_path)
     for line_no, reason in result.errors:
@@ -312,6 +389,7 @@ def cmd_import(args: argparse.Namespace) -> int:
 @handle_errors
 @timed
 def cmd_export(args: argparse.Namespace) -> int:
+    """`export --out CSV [--month | --from --to]`: 기간 안의 거래를 CSV 파일로 저장한다."""
     ctx = _context(args)
     count = ctx.io.export_csv(args.out, month=args.month, date_from=args.date_from, date_to=args.date_to)
     print("CSV를 생성했습니다: %s" % os.path.abspath(args.out))
@@ -321,12 +399,18 @@ def cmd_export(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- 파서
 class _Parser(argparse.ArgumentParser):
+    """옵션 오류 메시지를 한글 '오류: … / 힌트: …' 형식으로 바꾼 ArgumentParser. 종료 코드 2."""
+
     def error(self, message: str):
         self.print_usage(sys.stderr)
         self.exit(2, "오류: %s\n힌트: '%s --help' 로 사용법을 확인하세요\n" % (message, self.prog))
 
 
 def _positive_int(text: str) -> int:
+    """argparse 의 type= 에 쓰는 변환 함수. "5" → 5, 0 이하·정수 아님은 옵션 오류로 처리된다.
+
+    --limit, --top, --id 에 쓰인다.
+    """
     try:
         value = int(text)
     except ValueError:
@@ -352,6 +436,12 @@ def _common_parser() -> argparse.ArgumentParser:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """모든 명령과 옵션을 정의한 파서를 만든다.
+
+    각 서브명령에 set_defaults(func=cmd_*) 로 실행할 함수를 붙여 둔다.
+    그래서 parse_args 결과 args.func 가 곧 실행할 명령 함수가 되고, main 은 args.func(args) 만 부르면 된다.
+    새 명령을 추가하려면: cmd_* 함수를 만들고 여기서 add_command 로 등록하면 된다.
+    """
     # parents= 는 Action 객체를 공유하므로, set_defaults 가 서브파서에 번지지 않게 파서마다 새로 만든다.
     parser = _Parser(
         prog="python -m budget_app",
@@ -363,6 +453,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True, metavar="<command>", title="명령")
 
     def add_command(group, name: str, help_text: str, handler, **kwargs) -> argparse.ArgumentParser:
+        """서브명령 하나를 등록하고 실행 함수(handler)를 연결한다. 반환된 파서에 옵션을 추가한다."""
         sub = group.add_parser(
             name,
             help=help_text,
@@ -460,6 +551,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list] = None) -> int:
+    """프로그램 진입점. 명령줄을 해석해 해당 명령 함수를 실행하고 종료 코드를 반환한다.
+
+    argv 를 생략하면 실제 명령줄(sys.argv[1:])을 쓴다. 테스트에서는 리스트를 직접 넘긴다.
+    종료 코드: 0 성공, 1 데이터/파일 오류, 2 입력·옵션 오류, 130 Ctrl+C
+    """
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
